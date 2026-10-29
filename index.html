@@ -67,7 +67,7 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 <div class="boardhead"><span>NEAREST AIRCRAFT</span><strong>● LIVE</strong></div>
 <div class="flightmain"><div class="airlogo" id="airLogo"><img id="airLogoImg" alt="Airline logo"><span id="airLogoFallback">✈</span></div><div class="flightmeta"><div class="airline" id="airline">FLIGHTWALL</div><div class="callsign" id="callsign">YOUR FLIGHT</div>
 <div class="route"><div class="airport"><div class="code" id="fromCode">---</div><div class="city" id="fromCity">Departure airport</div></div><div class="routeicon">→</div><div class="airport"><div class="code" id="toCode">---</div><div class="city" id="toCity">Destination airport</div></div></div>
-</div><div class="plane-art" aria-hidden="true"><svg viewBox="0 0 400 150" role="img" aria-label="Dot-Matrix-Flugzeug"><defs><pattern id="planeDots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.15" fill="#eaf1f8"/></pattern><pattern id="cyanDots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.15" fill="#36dfff"/></pattern><pattern id="pinkDots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.15" fill="#ff4f8b"/></pattern></defs><path class="plane-dots" d="M15 72 L105 68 L155 19 L181 19 L171 66 L282 62 L348 43 L380 49 L363 72 L380 95 L348 101 L282 82 L171 78 L181 126 L155 126 L105 76 Z"/><path class="tail-cyan" d="M15 72 L105 68 L155 19 L181 19 L171 66 L143 70 L105 76 Z"/><path class="tail-pink" d="M15 72 L105 76 L143 70 L171 78 L181 126 L155 126 L105 76 Z"/></svg></div></div>
+</div><div class="plane-art" id="planeArt" aria-hidden="true"><svg id="planeSvg" viewBox="0 0 420 150" role="img" aria-label="Dot-Matrix-Passagierflugzeug"></svg></div></div>
 <div class="metrics"><div class="metric"><div class="label">AIRCRAFT</div><div class="value" id="aircraftType">A320</div></div><div class="metric"><div class="label">DISTANCE</div><div class="value" id="distance">— KM</div></div><div class="metric"><div class="label">ALTITUDE</div><div class="value" id="altitude">— FT</div></div><div class="metric"><div class="label">SPEED</div><div class="value" id="speed">— KTS</div></div></div>
 <div class="boardfoot"><span id="distanceLabel">CLOSEST TRACKED AIRCRAFT</span><span>DOT MATRIX DISPLAY</span></div>
 </section>
@@ -80,12 +80,108 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 <script>
 const $=id=>document.getElementById(id);let pos=null,timer=null,lastHex=null,loading=false;
 // Keep the GPS fix fresh; older browser positions can make the nearest-plane result misleading.
-const nmPerKm=1/1.852;
+const nmPerKm=1/1.852;drawAircraft('A320');
 function km(a,b,c,d){const R=6371,rad=x=>x*Math.PI/180,dl=rad(c-a),dn=rad(d-b),q=Math.sin(dl/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
 function niceAltFt(a){if(a==null||a==='ground'||!Number.isFinite(Number(a)))return a==='ground'?'GROUND':'— FT';return Math.round(Number(a)).toLocaleString('de-DE')+' FT'}
 function niceSpeedKts(a){if(a==null||!Number.isFinite(Number(a)))return '— KTS';return Math.round(Number(a))+' KTS'}
-function airlineInfo(callsign){const c=(callsign||'').trim().toUpperCase();const prefix=c.slice(0,3);const map={EWG:{name:'Eurowings',domain:'eurowings.com',short:'EW'},RYR:{name:'Ryanair',domain:'ryanair.com',short:'FR'},DLH:{name:'Lufthansa',domain:'lufthansa.com',short:'LH'},SWR:{name:'Swiss',domain:'swiss.com',short:'LX'},AUA:{name:'Austrian',domain:'austrian.com',short:'OS'},CFG:{name:'Condor',domain:'condor.com',short:'DE'},TUI:{name:'TUI fly',domain:'tuifly.com',short:'X3'},EZY:{name:'easyJet',domain:'easyjet.com',short:'U2'},VLG:{name:'Vueling',domain:'vueling.com',short:'VY'},IBE:{name:'Iberia',domain:'iberia.com',short:'IB'},AFR:{name:'Air France',domain:'airfrance.com',short:'AF'},KLM:{name:'KLM',domain:'klm.com',short:'KL'},BAW:{name:'British Airways',domain:'britishairways.com',short:'BA'},SAS:{name:'SAS',domain:'flysas.com',short:'SK'},TAP:{name:'TAP Air Portugal',domain:'flytap.com',short:'TP'},UAE:{name:'Emirates',domain:'emirates.com',short:'EK'},QTR:{name:'Qatar Airways',domain:'qatarairways.com',short:'QR'},THY:{name:'Turkish Airlines',domain:'turkishairlines.com',short:'TK'},LOT:{name:'LOT Polish Airlines',domain:'lot.com',short:'LO'},ACA:{name:'Air Canada',domain:'aircanada.com',short:'AC'},AAL:{name:'American Airlines',domain:'aa.com',short:'AA'},UAL:{name:'United Airlines',domain:'united.com',short:'UA'}};return map[prefix]||{name:'Airline',domain:'',short:prefix.slice(0,2)||'✈'}}
+function airlineInfo(callsign){
+ const c=(callsign||'').trim().toUpperCase(),prefix=c.slice(0,3);
+ // Airlines commonly seen over Germany: brand identity + representative livery colors.
+ const map={
+  EWG:{name:'Eurowings',domain:'eurowings.com',short:'EW',base:'#00bfe8',accent:'#e5007d',third:'#f32955',style:'eurowings'},
+  DLH:{name:'Lufthansa',domain:'lufthansa.com',short:'LH',base:'#071d49',accent:'#f5c400',third:'#ffffff',style:'lufthansa'},
+  RYR:{name:'Ryanair',domain:'ryanair.com',short:'FR',base:'#073590',accent:'#ffdf00',third:'#ffffff',style:'ryanair'},
+  CFG:{name:'Condor',domain:'condor.com',short:'DE',base:'#ffd400',accent:'#003b7a',third:'#ffffff',style:'condor'},
+  TUI:{name:'TUI fly',domain:'tuifly.com',short:'X3',base:'#e4002b',accent:'#ffffff',third:'#e4002b',style:'tui'},
+  EZY:{name:'easyJet',domain:'easyjet.com',short:'U2',base:'#ff6600',accent:'#ffffff',third:'#ff6600',style:'easyjet'},
+  WZZ:{name:'Wizz Air',domain:'wizzair.com',short:'W6',base:'#d50072',accent:'#5a2a82',third:'#ffffff',style:'wizz'},
+  SXS:{name:'SunExpress',domain:'sunexpress.com',short:'XQ',base:'#ffd400',accent:'#e1262f',third:'#ffffff',style:'sunexpress'},
+  PGT:{name:'Pegasus Airlines',domain:'flypgs.com',short:'PC',base:'#f36c21',accent:'#d71920',third:'#ffffff',style:'pegasus'},
+  '4Y':{name:'Discover Airlines',domain:'discover-airlines.com',short:'4Y',base:'#062c5b',accent:'#ff6a00',third:'#ffffff',style:'discover'},
+  OCN:{name:'Discover Airlines',domain:'discover-airlines.com',short:'4Y',base:'#062c5b',accent:'#ff6a00',third:'#ffffff',style:'discover'},
+  LHX:{name:'Lufthansa City Airlines',domain:'lufthansa-city.com',short:'VL',base:'#071d49',accent:'#f5c400',third:'#ffffff',style:'lufthansa'},
+  CLH:{name:'Lufthansa CityLine',domain:'lufthansa.com',short:'LH',base:'#071d49',accent:'#f5c400',third:'#ffffff',style:'lufthansa'},
+  SWR:{name:'SWISS',domain:'swiss.com',short:'LX',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'},
+  AUA:{name:'Austrian Airlines',domain:'austrian.com',short:'OS',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'},
+  AFR:{name:'Air France',domain:'airfrance.com',short:'AF',base:'#071d49',accent:'#e32636',third:'#ffffff',style:'airfrance'},
+  KLM:{name:'KLM',domain:'klm.com',short:'KL',base:'#00a1de',accent:'#ffffff',third:'#003b71',style:'klm'},
+  BAW:{name:'British Airways',domain:'britishairways.com',short:'BA',base:'#071d49',accent:'#d71920',third:'#5b9bd5',style:'british'},
+  VLG:{name:'Vueling',domain:'vueling.com',short:'VY',base:'#ffcc00',accent:'#222222',third:'#e32636',style:'vueling'},
+  IBE:{name:'Iberia',domain:'iberia.com',short:'IB',base:'#d71920',accent:'#ffcc00',third:'#ffffff',style:'iberia'},
+  TAP:{name:'TAP Air Portugal',domain:'flytap.com',short:'TP',base:'#087c55',accent:'#e32636',third:'#ffffff',style:'tap'},
+  THY:{name:'Turkish Airlines',domain:'turkishairlines.com',short:'TK',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'},
+  UAE:{name:'Emirates',domain:'emirates.com',short:'EK',base:'#d71920',accent:'#c7a66a',third:'#ffffff',style:'emirates'},
+  QTR:{name:'Qatar Airways',domain:'qatarairways.com',short:'QR',base:'#5c0632',accent:'#b7a57a',third:'#ffffff',style:'qatar'},
+  SAS:{name:'SAS',domain:'flysas.com',short:'SK',base:'#003b71',accent:'#00a1de',third:'#ffffff',style:'sas'},
+  LOT:{name:'LOT Polish Airlines',domain:'lot.com',short:'LO',base:'#003b71',accent:'#ffffff',third:'#00a1de',style:'klm'},
+  NAX:{name:'Norwegian',domain:'norwegian.com',short:'DY',base:'#d71920',accent:'#ffffff',third:'#003b71',style:'swiss'},
+  TVS:{name:'Smartwings',domain:'smartwings.com',short:'QS',base:'#d71920',accent:'#ffffff',third:'#003b71',style:'swiss'},
+  BEL:{name:'Brussels Airlines',domain:'brusselsairlines.com',short:'SN',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'},
+  LGL:{name:'Luxair',domain:'luxair.lu',short:'LG',base:'#003b71',accent:'#d71920',third:'#ffffff',style:'klm'},
+  BTI:{name:'airBaltic',domain:'airbaltic.com',short:'BT',base:'#6dbb45',accent:'#ffffff',third:'#005c4b',style:'airbaltic'},
+  AEE:{name:'Aegean Airlines',domain:'aegeanair.com',short:'A3',base:'#003b71',accent:'#00a1de',third:'#ffffff',style:'klm'},
+  DHL:{name:'DHL',domain:'dhl.com',short:'DHL',base:'#ffcc00',accent:'#d71920',third:'#ffffff',style:'dhl'},
+  UPS:{name:'UPS Airlines',domain:'ups.com',short:'5X',base:'#4b2b1a',accent:'#ffcc00',third:'#ffffff',style:'ups'},
+  FDX:{name:'FedEx Express',domain:'fedex.com',short:'FX',base:'#4d148c',accent:'#ff6600',third:'#ffffff',style:'fedex'},
+  AAL:{name:'American Airlines',domain:'aa.com',short:'AA',base:'#003b71',accent:'#d71920',third:'#c7cbd1',style:'british'},
+  UAL:{name:'United Airlines',domain:'united.com',short:'UA',base:'#003b71',accent:'#00a1de',third:'#ffffff',style:'klm'},
+  ACA:{name:'Air Canada',domain:'aircanada.com',short:'AC',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'}
+ };
+ return map[prefix]||{name:'Airline',domain:'',short:prefix.slice(0,2)||'✈',base:'#00bfe8',accent:'#e5007d',third:'#ffffff',style:'default'}
+}
 function showAirlineLogo(callsign){const info=airlineInfo(callsign);$('airLogoFallback').textContent=info.short;$('airLogoFallback').style.display='block';$('airLogoImg').style.display='none';$('airLogoImg').removeAttribute('src');if(info.domain){const img=$('airLogoImg');img.onload=()=>{img.style.display='block';$('airLogoFallback').style.display='none'};img.onerror=()=>{img.style.display='none';$('airLogoFallback').style.display='block'};img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(info.domain)+'&sz=128'}}
+function drawAircraft(type,callsign=''){
+ const t=(type||'').toUpperCase().replace(/[^A-Z0-9]/g,''),l=airlineInfo(callsign),style=l.style;
+ // Family-specific silhouettes with airline-specific dotted tail and accent livery.
+ let family='narrow';
+ if(/A380/.test(t)) family='a380';
+ else if(/ATR|AT[457]|DH8|Q400|DHC/.test(t)) family='prop';
+ else if(/A330|A340|A350|A359|A35K|B747|B767|B777|B787|B789|B78X|IL96|MD11/.test(t)) family='wide';
+ const styles={
+  narrow:{body:'M34 72 Q44 66 62 66 L322 66 Q350 66 381 70 L405 75 L381 80 Q350 84 322 84 L62 80 Q44 80 34 72 Z',tail:'M49 69 L61 36 L82 40 L79 68 Z',stab:'M47 71 L24 58 L20 61 L35 75 L20 85 L25 88 L49 78 Z',wing:'M151 67 L210 23 L237 25 L215 69 L274 88 L267 96 L196 80 L151 78 Z',engines:[{x:215,y:89,rx:13,ry:6},{x:252,y:91,rx:12,ry:5}],winglet:'M270 91 L281 100 L286 99 L278 89 Z'},
+  wide:{body:'M22 72 Q35 64 58 64 L330 64 Q363 64 390 70 L412 75 L390 81 Q363 86 330 86 L58 80 Q35 80 22 72 Z',tail:'M38 68 L51 30 L76 35 L71 68 Z',stab:'M39 71 L13 55 L9 59 L26 75 L9 88 L14 91 L39 78 Z',wing:'M138 65 L207 14 L241 17 L218 67 L286 89 L278 98 L198 80 L138 77 Z',engines:[{x:205,y:87,rx:17,ry:7},{x:250,y:91,rx:16,ry:7}],winglet:'M281 91 L293 103 L299 101 L288 89 Z'},
+  a380:{body:'M16 73 Q28 63 48 62 L330 62 Q366 63 393 70 L414 75 L393 82 Q366 88 330 88 L48 81 Q28 80 16 73 Z',tail:'M33 67 L45 29 L70 34 L67 68 Z',stab:'M32 71 L8 55 L5 60 L20 75 L5 89 L10 92 L33 79 Z',wing:'M123 64 L198 10 L235 13 L211 66 L291 90 L283 99 L193 80 L123 77 Z',engines:[{x:188,y:86,rx:15,ry:7},{x:220,y:89,rx:15,ry:7},{x:253,y:92,rx:15,ry:7},{x:282,y:94,rx:13,ry:6}],winglet:'M286 92 L298 103 L304 101 L293 90 Z'},
+  prop:{body:'M42 73 Q52 67 70 67 L323 68 Q350 69 379 73 L396 76 L379 79 Q350 82 323 82 L70 81 Q52 80 42 73 Z',tail:'M56 70 L65 38 L84 42 L81 69 Z',stab:'M54 72 L32 60 L28 63 L42 75 L28 85 L33 88 L55 79 Z',wing:'M158 68 L216 27 L237 29 L216 70 L269 86 L263 93 L198 80 L158 78 Z',engines:[{x:201,y:88,rx:12,ry:8},{x:242,y:89,rx:12,ry:8}],winglet:'M266 88 L277 98 L282 96 L274 86 Z'}
+ };
+ const a=styles[family];
+ const dots=`<defs>
+ <pattern id="planeDots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2.6" cy="2.6" r="2.05" fill="#f2f6fc"/></pattern>
+ <pattern id="tailBase" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2.6" cy="2.6" r="2.05" fill="${l.base}"/></pattern>
+ <pattern id="tailAccent" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2.6" cy="2.6" r="2.05" fill="${l.accent}"/></pattern>
+ <pattern id="tailThird" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2.6" cy="2.6" r="2.05" fill="${l.third}"/></pattern>
+ <pattern id="cyanDots" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2.6" cy="2.6" r="2.05" fill="#36dfff"/></pattern>
+ </defs>`;
+ const engines=a.engines.map(e=>`<ellipse cx="${e.x}" cy="${e.y}" rx="${e.rx}" ry="${e.ry}" fill="url(#planeDots)"/>`).join('');
+ const props=family==='prop'?'<g fill="none" stroke="url(#tailBase)" stroke-width="3" stroke-linecap="round"><path d="M188 77 L179 62 M188 77 L199 61 M188 77 L177 91 M230 78 L221 63 M230 78 L241 63 M230 78 L219 92"/></g>':'';
+ const hump=family==='a380'?'<path d="M115 65 L115 58 Q118 53 130 53 L250 53 Q262 53 265 64 Z" fill="url(#planeDots)"/>':'';
+ // Tail art is deliberately tiny and dot-matrix-like, echoing each airline's real palette.
+ let tailArt='';
+ if(style==='eurowings') tailArt='<path d="M49 69 L61 36 L70 38 L61 68 Z" fill="url(#tailAccent)"/><path d="M61 68 L72 40 L82 42 L79 68 Z" fill="url(#tailThird)"/>';
+ else if(style==='lufthansa') tailArt='<path d="M54 67 L62 39 L78 42 L76 67 Z" fill="url(#tailAccent)"/><circle cx="67" cy="54" r="5" fill="url(#tailThird)"/>';
+ else if(style==='ryanair') tailArt='<path d="M49 69 L61 36 L70 38 L61 68 Z" fill="url(#tailAccent)"/><path d="M59 66 L72 40 L78 42 L75 67 Z" fill="url(#tailThird)"/>';
+ else if(style==='condor') tailArt='<path d="M52 66 L60 38 L66 39 L59 67 Z" fill="url(#tailAccent)"/><path d="M64 67 L72 40 L78 42 L76 67 Z" fill="url(#tailThird)"/>';
+ else if(style==='tui') tailArt='<path d="M50 69 L62 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M55 60 Q65 48 76 57" fill="none" stroke="url(#tailThird)" stroke-width="4"/>';
+ else if(style==='easyJet') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M54 63 L74 42" stroke="url(#tailThird)" stroke-width="3"/>';
+ else if(style==='wizz') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M51 64 L76 43 L79 48 L58 68 Z" fill="url(#tailThird)"/>';
+ else if(style==='sunexpress') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailAccent)"/><path d="M54 64 L74 43" stroke="url(#tailThird)" stroke-width="4"/>';
+ else if(style==='discover') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M57 65 L70 42 L77 44 L65 68 Z" fill="url(#tailAccent)"/>';
+ else if(style==='swiss') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M56 62 L70 43 L77 44 L63 67 Z" fill="url(#tailThird)"/>';
+ else if(style==='airfrance'||style==='british') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M53 65 L70 40 L76 42 L60 68 Z" fill="url(#tailAccent)"/><path d="M62 68 L76 43 L80 45 L72 68 Z" fill="url(#tailThird)"/>';
+ else if(style==='klm') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M57 64 L71 41 L77 43 L64 68 Z" fill="url(#tailThird)"/>';
+ else if(style==='vueling') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M54 62 L70 43 L76 45 L62 67 Z" fill="url(#tailAccent)"/>';
+ else if(style==='iberia') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M54 63 L70 41 L76 43 L62 68 Z" fill="url(#tailAccent)"/>';
+ else if(style==='tap') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M55 64 L72 41 L78 43 L63 68 Z" fill="url(#tailAccent)"/>';
+ else if(style==='emirates'||style==='qatar') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M55 64 L71 41 L77 43 L63 68 Z" fill="url(#tailAccent)"/>';
+ else if(style==='airbaltic') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M56 64 L71 41 L77 43 L64 68 Z" fill="url(#tailThird)"/>';
+ else if(style==='dhl') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M52 62 L77 43" stroke="url(#tailAccent)" stroke-width="5"/>';
+ else if(style==='ups') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M55 64 L71 41 L77 43 L63 68 Z" fill="url(#tailAccent)"/>';
+ else if(style==='fedex') tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M55 64 L71 41 L77 43 L63 68 Z" fill="url(#tailAccent)"/>';
+ else tailArt='<path d="M49 69 L61 36 L82 40 L79 68 Z" fill="url(#tailBase)"/><path d="M57 64 L71 41 L77 43 L64 68 Z" fill="url(#tailAccent)"/>';
+ // Airline-colored thin cheatline along the fuselage; white body remains readable at small size.
+ const stripe=`<path d="M88 77 L333 78 L374 77 L354 80 L88 80 Z" fill="url(#tailAccent)" opacity=".9"/>`;
+ $('planeSvg').innerHTML=dots+`<path d="${a.wing}" fill="url(#planeDots)"/><path d="${a.winglet}" fill="url(#planeDots)"/><path d="${a.stab}" fill="url(#planeDots)"/><path d="${a.tail}" fill="url(#tailBase)"/>${tailArt}<path d="${a.body}" fill="url(#planeDots)"/>${stripe}${hump}${engines}${props}`;
+ $('planeSvg').setAttribute('aria-label',`Dot-Matrix-Flugzeugtyp ${type||'unbekannt'} in Farben von ${l.name}`);
+}
 async function getJson(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen Standort freigeben.';return}if(loading)return;loading=true;$('liveText').textContent='SUCHE';$('status').textContent='Suche nach dem nächstgelegenen erfassten Flugzeug …';try{
  const radiusKm=Number($('radius').value),radiusNm=Math.min(65,Math.ceil(radiusKm*nmPerKm));
@@ -99,7 +195,7 @@ async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen S
  $('feedStatus').textContent='Datenquelle: '+rawAircraft.length+' Flugzeuge gemeldet; '+aircraft.length+' mit gültigen Koordinaten.';
  const validAircraft=aircraft.filter(a=>a.d<=radiusKm && a.seenPosSeconds<=60).sort((a,b)=>a.d-b.d);
  if(!validAircraft.length){$('airline').textContent='KEIN FLUGZEUG';$('callsign').textContent='IM GEWÄHLTEN RADIUS';$('aircraftType').textContent='—';$('distance').textContent='— KM';$('altitude').textContent='— FT';$('speed').textContent='— KTS';$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='';$('toCity').textContent='';$('status').textContent='Keine frische Position innerhalb von '+radiusKm+' km. Empfangslücken sind möglich; bitte später erneut versuchen.';$('liveText').textContent='KEIN TREFFER';return}
- const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=[ai.name,a.r].filter(Boolean).join(' · ').toUpperCase()||('ICAO '+a.hex.toUpperCase());$('aircraftType').textContent=(a.t||'—').toUpperCase();showAirlineLogo(a.flight);$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
+ const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=[ai.name,a.r].filter(Boolean).join(' · ').toUpperCase()||('ICAO '+a.hex.toUpperCase());$('aircraftType').textContent=(a.t||'—').toUpperCase();drawAircraft(a.t||'',a.flight||'');showAirlineLogo(a.flight);$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
  const cs=(a.flight||'').trim();if(cs){try{const route=await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);const d=route.response;if(d?.flightroute){const fr=d.flightroute,orig=fr.origin||{},dest=fr.destination||{};$('fromCode').textContent=orig.iata_code||orig.icao_code||'— — —';$('toCode').textContent=dest.iata_code||dest.icao_code||'— — —';$('fromCity').textContent=(orig.name||'Abflug')+' · Flugplandaten';$('toCity').textContent=(dest.name||'Ziel')+' · nicht live bestätigt'}}catch(e){$('fromCity').textContent='Route nicht verfügbar';$('toCity').textContent=''}}
  }catch(e){$('liveText').textContent='OFFLINE';$('status').textContent='Flugdaten gerade nicht erreichbar. Bitte erneut versuchen; die offene Datenquelle kann zeitweise begrenzen.';$('feedStatus').textContent='Fehler beim Abruf der Live-Daten.'}finally{loading=false}}
 function start(){if(!navigator.geolocation){$('status').textContent='Dieser Browser unterstützt keine Standortfreigabe.';return}$('status').textContent='Bitte die Standortabfrage erlauben …';navigator.geolocation.getCurrentPosition(p=>{pos={lat:p.coords.latitude,lon:p.coords.longitude};$('status').textContent='Standort aktualisiert · Genauigkeit ca. '+Math.round(p.coords.accuracy)+' m';refresh();if(timer)clearInterval(timer);timer=setInterval(()=>navigator.geolocation.getCurrentPosition(q=>{pos={lat:q.coords.latitude,lon:q.coords.longitude};refresh()},()=>refresh(),{enableHighAccuracy:true,timeout:12000,maximumAge:0}),30000)},e=>{$('status').textContent=e.code===1?'Standortfreigabe abgelehnt. Bitte in den Safari-Einstellungen erlauben.':'Standort konnte nicht bestimmt werden. Bitte erneut versuchen.'},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})}
