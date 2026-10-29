@@ -28,7 +28,7 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 .airlogo{width:100%;max-width:250px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;border:0;color:var(--cyan);font-family:Arial,sans-serif;font-size:clamp(30px,5vw,70px);font-weight:900;text-align:center;letter-spacing:-.05em;text-shadow:0 0 12px #36dfff44}
 .airlogo img{width:100%;height:100%;object-fit:contain;padding:0;display:none;filter:drop-shadow(0 0 5px #ffffff16)}
 .plane-art{grid-column:3;grid-row:1;display:flex;align-items:center;justify-content:center;min-width:0;opacity:.98;filter:drop-shadow(0 0 10px #d9f5ff12)}
-.plane-art svg{display:block;width:100%;max-width:430px;height:auto;overflow:visible}.plane-art img{display:none;width:100%;max-width:500px;max-height:220px;object-fit:contain;object-position:center;background:transparent;border-radius:2px}
+.plane-art svg{display:block;width:100%;max-width:430px;height:auto;overflow:visible}.plane-art img{display:none;width:100%;max-width:680px;max-height:220px;object-fit:contain;object-position:center;background:transparent;border-radius:2px}.plane-photo-note{display:none;color:#66717e;font:10px ui-sans-serif,system-ui,sans-serif;text-align:center;letter-spacing:.08em}
 .plane-art .plane-dots{fill:url(#planeDots)}
 .plane-art .tail-cyan{fill:url(#cyanDots)}
 .plane-art .tail-pink{fill:url(#pinkDots)}
@@ -159,7 +159,7 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 <div class="boardhead"><span>NEAREST AIRCRAFT</span><strong>● LIVE</strong></div>
 <div class="flightmain"><div class="airlogo" id="airLogo"><img id="airLogoImg" alt="Airline logo"><span id="airLogoFallback">✈</span></div><div class="flightmeta"><div class="airline" id="airline">FLIGHTWALL</div><div class="callsign" id="callsign">YOUR FLIGHT</div>
 <div class="route"><div class="airport"><div class="code" id="fromCode">---</div><div class="city" id="fromCity">Departure airport</div></div><div class="routeicon">→</div><div class="airport"><div class="code" id="toCode">---</div><div class="city" id="toCity">Destination airport</div></div></div>
-</div><div class="plane-art" id="planeArt" aria-label="Flugzeugbild"><img id="planePhoto" alt="Foto des erfassten Flugzeugs" loading="lazy"><svg id="planeSvg" viewBox="0 0 420 150" role="img" aria-label="Stilisierte Flugzeugsilhouette"></svg></div></div>
+</div><div class="plane-art" id="planeArt" aria-label="Flugzeugbild"><img id="planePhoto" alt="Foto eines Flugzeugs derselben Airline und desselben Typs" loading="eager" referrerpolicy="no-referrer"><span class="plane-photo-note" id="photoNote">FLUGZEUGFOTO</span><svg id="planeSvg" viewBox="0 0 420 150" role="img" aria-label="Stilisierte Flugzeugsilhouette"></svg></div></div>
 <div class="metrics"><div class="metric"><div class="label">AIRCRAFT</div><div class="value" id="aircraftType">A320</div></div><div class="metric"><div class="label">DISTANCE</div><div class="value" id="distance">— KM</div></div><div class="metric"><div class="label">ALTITUDE</div><div class="value" id="altitude">— FT</div></div><div class="metric"><div class="label">SPEED</div><div class="value" id="speed">— KTS</div></div></div>
 <div class="boardfoot"><span id="distanceLabel">CLOSEST TRACKED AIRCRAFT</span><span>DOT MATRIX DISPLAY</span></div>
 </section>
@@ -274,48 +274,61 @@ function drawAircraft(type,callsign=''){
  $('planeSvg').innerHTML=dots+`<path d="${a.wing}" fill="url(#planeDots)"/><path d="${a.winglet}" fill="url(#planeDots)"/><path d="${a.stab}" fill="url(#planeDots)"/><path d="${a.tail}" fill="url(#tailBase)"/>${tailArt}<path d="${a.body}" fill="url(#planeDots)"/>${stripe}${hump}${engines}${props}`;
  $('planeSvg').setAttribute('aria-label',`Dot-Matrix-Flugzeugtyp ${type||'unbekannt'} in Farben von ${l.name}`);
 }
-async function getPlanePhoto(hex,type='',callsign=''){
- const img=$('planePhoto'),svg=$('planeSvg');
- img.style.display='none';img.removeAttribute('src');svg.style.display='block';
- const usePhoto=(src)=>new Promise(resolve=>{
+async function getPlanePhoto(hex,type='',callsign='',registration=''){
+ const img=$('planePhoto'),svg=$('planeSvg'),note=$('photoNote');
+ img.style.display='none';note.style.display='none';img.removeAttribute('src');svg.style.display='none';
+ const loadImage=(src)=>new Promise(resolve=>{
    if(!src){resolve(false);return}
-   img.onload=()=>{img.style.display='block';svg.style.display='none';resolve(true)};
-   img.onerror=()=>{img.style.display='none';svg.style.display='block';resolve(false)};
-   img.src=src;
+   let settled=false;const done=(ok)=>{if(settled)return;settled=true;img.onload=null;img.onerror=null;if(ok){img.style.display='block';svg.style.display='none';note.style.display='none'}resolve(ok)};
+   img.onload=()=>done(true);img.onerror=()=>done(false);img.src=src;
+   setTimeout(()=>done(false),7000);
  });
- // First try the exact aircraft registration/hex photo database.
+ const info=airlineInfo(callsign),raw=(type||'').toUpperCase();
+ let family='passenger aircraft';
+ if(/A380/.test(raw))family='Airbus A380';
+ else if(/A350|A359|A35K/.test(raw))family='Airbus A350';
+ else if(/A330|A340/.test(raw))family='Airbus A330';
+ else if(/A32|A20N|A21N/.test(raw))family='Airbus A320';
+ else if(/B77|B777/.test(raw))family='Boeing 777';
+ else if(/B78|B787/.test(raw))family='Boeing 787';
+ else if(/B76|B767/.test(raw))family='Boeing 767';
+ else if(/B74|B747/.test(raw))family='Boeing 747';
+ else if(/B73|B737|B38M/.test(raw))family='Boeing 737';
+ else if(/E19|E17|E75|E90/.test(raw))family='Embraer aircraft';
+ else if(/ATR|DH8|Q400/.test(raw))family='ATR turboprop aircraft';
+ // 1) Exact-aircraft photo, when the photo database has a match.
  if(hex){
   try{
    const data=await getJson('https://api.planespotters.net/pub/photos/hex/'+encodeURIComponent(hex));
    const photo=(data.photos||[])[0];
    const src=photo&&(photo.thumbnail_large?.src||photo.thumbnail?.src||photo.link);
-   if(src && await usePhoto(src)) return;
-  }catch(e){/* continue to the aircraft-type photo search */}
+   if(src&&await loadImage(src))return;
+  }catch(e){}
  }
- // If no exact photo is available, find a real photo of the same airline and aircraft family.
- try{
-  const info=airlineInfo(callsign);
-  const raw=(type||'').toUpperCase();
-  let family='passenger aircraft';
-  if(/A380/.test(raw))family='Airbus A380';
-  else if(/A350|A359|A35K/.test(raw))family='Airbus A350';
-  else if(/A330|A340/.test(raw))family='Airbus A330';
-  else if(/A32|A20N|A21N/.test(raw))family='Airbus A320';
-  else if(/B77|B777/.test(raw))family='Boeing 777';
-  else if(/B78|B787/.test(raw))family='Boeing 787';
-  else if(/B76|B767/.test(raw))family='Boeing 767';
-  else if(/B74|B747/.test(raw))family='Boeing 747';
-  else if(/B73|B737|B38M/.test(raw))family='Boeing 737';
-  else if(/E19|E17|E75|E90/.test(raw))family='Embraer aircraft';
-  else if(/ATR|DH8|Q400/.test(raw))family='ATR turboprop aircraft';
-  const query=encodeURIComponent(`${info.name} ${family} aircraft livery`);
-  const url=`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${query}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url&iiurlwidth=1000&format=json&origin=*`;
-  const data=await getJson(url);
-  const pages=Object.values(data.query?.pages||{});
-  const candidate=pages.find(p=>p.imageinfo?.[0]?.thumburl||p.imageinfo?.[0]?.url);
-  const src=candidate?.imageinfo?.[0]?.thumburl||candidate?.imageinfo?.[0]?.url;
-  if(src && await usePhoto(src)) return;
- }catch(e){/* use the type-specific LED silhouette if photo search is unavailable */}
+ // 2) Search Wikimedia Commons for a real photo. Search registration first, then airline + aircraft type.
+ const searches=[];
+ if(registration)searches.push(`"${registration}" aircraft`);
+ searches.push(`${info.name} ${family} aircraft`);
+ searches.push(`${family} ${info.name} livery`);
+ for(const q of searches){
+  try{
+   const searchUrl='https://commons.wikimedia.org/w/api.php?action=query&list=search&srnamespace=6&srlimit=8&srsearch='+encodeURIComponent(q)+'&format=json&origin=*';
+   const searchData=await getJson(searchUrl);
+   const hits=searchData.query?.search||[];
+   for(const hit of hits){
+    const title=hit.title||'';
+    if(!/\.(jpe?g|png|webp)$/i.test(title))continue;
+    const detailUrl='https://commons.wikimedia.org/w/api.php?action=query&titles='+encodeURIComponent(title)+'&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*';
+    const detail=await getJson(detailUrl);
+    const page=Object.values(detail.query?.pages||{})[0];
+    const image=page?.imageinfo?.[0];
+    const src=image?.thumburl||image?.url;
+    if(src&&await loadImage(src))return;
+   }
+  }catch(e){}
+ }
+ // If no photo service responds, do not show the misleading generic vector plane.
+ svg.style.display='none';note.textContent='ECHTES FLUGZEUGFOTO GERADE NICHT VERFÜGBAR';note.style.display='block';
 }
 
 async function getJson(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
@@ -331,7 +344,7 @@ async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen S
  $('feedStatus').textContent='Datenquelle: '+rawAircraft.length+' Flugzeuge gemeldet; '+aircraft.length+' mit gültigen Koordinaten.';
  const validAircraft=aircraft.filter(a=>a.d<=radiusKm && a.seenPosSeconds<=60).sort((a,b)=>a.d-b.d);
  if(!validAircraft.length){$('airline').textContent='KEIN FLUGZEUG';$('callsign').textContent='IM GEWÄHLTEN RADIUS';$('aircraftType').textContent='—';$('distance').textContent='— KM';$('altitude').textContent='— FT';$('speed').textContent='— KTS';$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='';$('toCity').textContent='';$('status').textContent='Keine frische Position innerhalb von '+radiusKm+' km. Empfangslücken sind möglich; bitte später erneut versuchen.';$('liveText').textContent='KEIN TREFFER';return}
- const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=[ai.name,a.r].filter(Boolean).join(' · ').toUpperCase()||('ICAO '+a.hex.toUpperCase());$('aircraftType').textContent=(a.t||'—').toUpperCase();drawAircraft(a.t||'',a.flight||'');showAirlineLogo(a.flight);getPlanePhoto(a.hex,a.t||'',a.flight||'');$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
+ const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=[ai.name,a.r].filter(Boolean).join(' · ').toUpperCase()||('ICAO '+a.hex.toUpperCase());$('aircraftType').textContent=(a.t||'—').toUpperCase();drawAircraft(a.t||'',a.flight||'');showAirlineLogo(a.flight);getPlanePhoto(a.hex,a.t||'',a.flight||'',a.r||'');$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
  const cs=(a.flight||'').trim();if(cs){try{const route=await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);const d=route.response;if(d?.flightroute){const fr=d.flightroute,orig=fr.origin||{},dest=fr.destination||{};$('fromCode').textContent=orig.iata_code||orig.icao_code||'— — —';$('toCode').textContent=dest.iata_code||dest.icao_code||'— — —';$('fromCity').textContent=(orig.name||'Abflug')+' · Flugplandaten';$('toCity').textContent=(dest.name||'Ziel')+' · nicht live bestätigt'}}catch(e){$('fromCity').textContent='Route nicht verfügbar';$('toCity').textContent=''}}
  }catch(e){$('liveText').textContent='OFFLINE';$('status').textContent='Flugdaten gerade nicht erreichbar. Bitte erneut versuchen; die offene Datenquelle kann zeitweise begrenzen.';$('feedStatus').textContent='Fehler beim Abruf der Live-Daten.'}finally{loading=false}}
 function start(){if(!navigator.geolocation){$('status').textContent='Dieser Browser unterstützt keine Standortfreigabe.';return}$('status').textContent='Bitte die Standortabfrage erlauben …';navigator.geolocation.getCurrentPosition(p=>{pos={lat:p.coords.latitude,lon:p.coords.longitude};$('status').textContent='Standort aktualisiert · Genauigkeit ca. '+Math.round(p.coords.accuracy)+' m';refresh();if(timer)clearInterval(timer);timer=setInterval(()=>navigator.geolocation.getCurrentPosition(q=>{pos={lat:q.coords.latitude,lon:q.coords.longitude};refresh()},()=>refresh(),{enableHighAccuracy:true,timeout:12000,maximumAge:0}),30000)},e=>{$('status').textContent=e.code===1?'Standortfreigabe abgelehnt. Bitte in den Safari-Einstellungen erlauben.':'Standort konnte nicht bestimmt werden. Bitte erneut versuchen.'},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})}
