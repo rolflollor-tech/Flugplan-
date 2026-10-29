@@ -26,7 +26,7 @@ function niceAlt(a){if(a==null||a==='ground')return a==='ground'?'Am Boden':'—
 async function getJson(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen Standort freigeben.';return}if(loading)return;loading=true;$('liveText').textContent='SUCHE';$('status').textContent='Suche nach dem nächstgelegenen erfassten Flugzeug …';try{
  const radiusKm=Number($('radius').value),radiusNm=Math.min(65,Math.ceil(radiusKm*nmPerKm));
- const data=await getJson(`https://flightwall-api.rolf-lollor-a84.workers.dev/?lat=${pos.lat.toFixed(4)}&lon=${pos.lon.toFixed(4)}&dist=${radiusNm}`);
+ const data=await getJson(`https://hello-http.val.run/v2/point/${pos.lat.toFixed(4)}/${pos.lon.toFixed(4)}/${radiusNm}`);
  const rawAircraft=data.aircraft||data.ac||[];
  const aircraft=rawAircraft.map(a=>({...a,alt_baro:a.alt_baro??a.altitude,flight:a.flight||a.callsign,r:a.r||a.registration,t:a.t||a.type,hex:a.hex||''}))
   .filter(a=>Number.isFinite(Number(a.lat))&&Number.isFinite(Number(a.lon))&&a.alt_baro!=='ground')
