@@ -26,7 +26,9 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 .boardhead,.boardfoot{display:none}
 .flightmain{grid-column:1;grid-row:1;display:grid;grid-template-columns:minmax(100px,18%) minmax(0,1fr) minmax(180px,30%);align-items:center;column-gap:clamp(16px,3vw,48px);min-width:0;padding:0}
 .airlogo{width:100%;max-width:250px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;border:0;color:var(--cyan);font-family:Arial,sans-serif;font-size:clamp(30px,5vw,70px);font-weight:900;text-align:center;letter-spacing:-.05em;text-shadow:0 0 12px #36dfff44}
-.airlogo img{width:100%;height:100%;object-fit:contain;padding:0;display:none;filter:drop-shadow(0 0 5px #ffffff16)}
+.airlogo img{width:100%;height:100%;object-fit:contain;padding:8px;display:none;filter:drop-shadow(0 0 8px #ffffff25);image-rendering:auto}
+.airlogo{min-width:64px;min-height:64px}
+#airLogoFallback{font-size:clamp(22px,4vw,42px);line-height:1;white-space:nowrap}
 .plane-art{grid-column:3;grid-row:1;display:flex;align-items:center;justify-content:center;min-width:0;opacity:.98;filter:drop-shadow(0 0 10px #d9f5ff12)}
 .plane-art svg{display:block;width:100%;max-width:430px;height:auto;overflow:visible}.plane-art img{display:none;width:100%;max-width:680px;max-height:220px;object-fit:contain;object-position:center;background:transparent;border-radius:2px}.plane-photo-note{display:none;color:#66717e;font:10px ui-sans-serif,system-ui,sans-serif;text-align:center;letter-spacing:.08em}
 .plane-art .plane-dots{fill:url(#planeDots)}
@@ -221,7 +223,7 @@ function airlineInfo(callsign){
  };
  return map[prefix]||{name:(prefix||'AIRLINE'),domain:'',short:(prefix||'✈').slice(0,3),base:'#36dfff',accent:'#ff4f8b',third:'#f5f7fb',style:'default'}
 }
-function showAirlineLogo(callsign){const info=airlineInfo(callsign);$('airLogoFallback').textContent=info.short;$('airLogoFallback').style.display='block';$('airLogoImg').style.display='none';$('airLogoImg').removeAttribute('src');if(info.domain){const img=$('airLogoImg');img.onload=()=>{img.style.display='block';$('airLogoFallback').style.display='none'};img.onerror=()=>{img.style.display='none';$('airLogoFallback').style.display='block'};img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(info.domain)+'&sz=128'}}
+function showAirlineLogo(callsign){const info=airlineInfo(callsign);$('airLogoFallback').textContent=info.short;$('airLogoFallback').style.display='block';$('airLogoImg').style.display='none';$('airLogoImg').removeAttribute('src');if(info.domain){const img=$('airLogoImg');img.onload=()=>{img.style.display='block';$('airLogoFallback').style.display='none'};img.onerror=()=>{img.onerror=null;img.onload=null;img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(info.domain)+'&sz=256';img.onload=()=>{img.style.display='block';$('airLogoFallback').style.display='none'};img.onerror=()=>{img.style.display='none';$('airLogoFallback').style.display='block'}};img.src='https://logo.clearbit.com/'+encodeURIComponent(info.domain)+'?size=256'}}
 function drawAircraft(type,callsign=''){
  const t=(type||'').toUpperCase().replace(/[^A-Z0-9]/g,''),l=airlineInfo(callsign),style=l.style;
  // Family-specific silhouettes with airline-specific dotted tail and accent livery.
@@ -345,7 +347,23 @@ async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen S
  const validAircraft=aircraft.filter(a=>a.d<=radiusKm && a.seenPosSeconds<=60).sort((a,b)=>a.d-b.d);
  if(!validAircraft.length){$('airline').textContent='KEIN FLUGZEUG';$('callsign').textContent='IM GEWÄHLTEN RADIUS';$('aircraftType').textContent='—';$('distance').textContent='— KM';$('altitude').textContent='— FT';$('speed').textContent='— KTS';$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='';$('toCity').textContent='';$('status').textContent='Keine frische Position innerhalb von '+radiusKm+' km. Empfangslücken sind möglich; bitte später erneut versuchen.';$('liveText').textContent='KEIN TREFFER';return}
  const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=[ai.name,a.r].filter(Boolean).join(' · ').toUpperCase()||('ICAO '+a.hex.toUpperCase());$('aircraftType').textContent=(a.t||'—').toUpperCase();drawAircraft(a.t||'',a.flight||'');showAirlineLogo(a.flight);getPlanePhoto(a.hex,a.t||'',a.flight||'',a.r||'');$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
- const cs=(a.flight||'').trim();if(cs){try{const route=await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);const d=route.response;if(d?.flightroute){const fr=d.flightroute,orig=fr.origin||{},dest=fr.destination||{};$('fromCode').textContent=orig.iata_code||orig.icao_code||'— — —';$('toCode').textContent=dest.iata_code||dest.icao_code||'— — —';$('fromCity').textContent=(orig.name||'Abflug')+' · Flugplandaten';$('toCity').textContent=(dest.name||'Ziel')+' · nicht live bestätigt'}}catch(e){$('fromCity').textContent='Route nicht verfügbar';$('toCity').textContent=''}}
+ const cs=(a.flight||'').trim();if(cs){
+  let routeFound=false;
+  // ADSBDB lookup by the live callsign/flight number; try common formatting variants.
+  const variants=[...new Set([cs,cs.replace(/\s+/g,''),cs.replace(/[-_]/g,'')])];
+  for(const flightId of variants){
+   try{
+    const route=await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(flightId)}`);
+    const fr=route.response?.flightroute;
+    if(fr?.origin&&fr?.destination){
+     const orig=fr.origin,dest=fr.destination;
+     $('fromCode').textContent=orig.iata_code||orig.icao_code||'---';$('toCode').textContent=dest.iata_code||dest.icao_code||'---';
+     $('fromCity').textContent=(orig.name||orig.municipality||'Abflug')+' · geplant';$('toCity').textContent=(dest.name||dest.municipality||'Ziel')+' · geplant';routeFound=true;break;
+    }
+   }catch(e){}
+  }
+  if(!routeFound){$('fromCity').textContent='Keine Streckenzuordnung für '+cs.toUpperCase();$('toCity').textContent='Flugnummer wird nicht in der Routendatenbank gefunden';}
+ }
  }catch(e){$('liveText').textContent='OFFLINE';$('status').textContent='Flugdaten gerade nicht erreichbar. Bitte erneut versuchen; die offene Datenquelle kann zeitweise begrenzen.';$('feedStatus').textContent='Fehler beim Abruf der Live-Daten.'}finally{loading=false}}
 function start(){if(!navigator.geolocation){$('status').textContent='Dieser Browser unterstützt keine Standortfreigabe.';return}$('status').textContent='Bitte die Standortabfrage erlauben …';navigator.geolocation.getCurrentPosition(p=>{pos={lat:p.coords.latitude,lon:p.coords.longitude};$('status').textContent='Standort aktualisiert · Genauigkeit ca. '+Math.round(p.coords.accuracy)+' m';refresh();if(timer)clearInterval(timer);timer=setInterval(()=>navigator.geolocation.getCurrentPosition(q=>{pos={lat:q.coords.latitude,lon:q.coords.longitude};refresh()},()=>refresh(),{enableHighAccuracy:true,timeout:12000,maximumAge:0}),30000)},e=>{$('status').textContent=e.code===1?'Standortfreigabe abgelehnt. Bitte in den Safari-Einstellungen erlauben.':'Standort konnte nicht bestimmt werden. Bitte erneut versuchen.'},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})}
 $('startBtn').addEventListener('click',start);$('refreshBtn').addEventListener('click',refresh);$('viewBtn').addEventListener('click',async()=>{const app=document.querySelector('.app');const immersive=!app.classList.contains('immersive');app.classList.toggle('immersive',immersive);$('viewBtn').textContent=immersive?'NORMAL':'VOLLBILD';if(immersive&&app.requestFullscreen){try{await app.requestFullscreen()}catch(e){}}else if(!immersive&&document.fullscreenElement&&document.exitFullscreen){try{await document.exitFullscreen()}catch(e){}}});document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement){document.querySelector('.app').classList.remove('immersive');$('viewBtn').textContent='VOLLBILD'}});$('radius').addEventListener('input',()=>{$('radiusText').textContent=$('radius').value+' km'});$('radius').addEventListener('change',refresh);
