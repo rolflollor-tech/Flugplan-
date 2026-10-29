@@ -152,6 +152,19 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
  .metrics{padding-top:clamp(12px,2vh,22px);margin-top:clamp(12px,2vh,22px)}
 }
 
+
+/* FlightWall photo/logo sizing refinement */
+.airlogo{width:100%;max-width:150px;min-width:76px;aspect-ratio:1/1;justify-self:center;align-self:center;overflow:hidden}
+.airlogo img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;padding:5px;image-rendering:auto}
+.airlogo #airLogoFallback{font-size:clamp(26px,4vw,58px);font-weight:900;letter-spacing:-.06em;text-shadow:0 0 12px currentColor}
+.plane-art{width:min(100%,1000px);max-width:1000px;height:clamp(180px,32vh,380px);}
+.plane-art img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center}
+@media (orientation:portrait){
+ .airlogo{width:76px;max-width:76px;min-width:76px}
+ .airlogo #airLogoFallback{font-size:30px}
+ .plane-art{width:100%;max-width:100%;height:clamp(170px,29vh,290px)}
+}
+
 </style>
 </head>
 <body>
