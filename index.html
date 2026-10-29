@@ -58,6 +58,54 @@ body{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation M
 @media (orientation:landscape){.app{min-height:100svh}.board{min-height:0}.flightmain{grid-template-columns:minmax(100px,17%) minmax(0,1fr) minmax(170px,28%)}.airlogo{max-width:clamp(100px,15vw,220px)}.metrics{padding-top:clamp(14px,3vh,30px)}}
 @media (orientation:portrait){.app{padding:14px;gap:10px}.board{min-height:70svh;padding:24px 18px}.flightmain{grid-template-columns:62px minmax(0,1fr);column-gap:16px;align-items:start}.plane-art{grid-column:2;grid-row:2;margin-top:10px;max-width:220px;justify-self:end;width:100%}.airlogo{width:62px;max-width:62px;aspect-ratio:1;font-size:26px}.flightmeta{gap:12px}.airline{font-size:clamp(14px,4.5vw,22px)}.callsign{font-size:clamp(22px,7vw,36px)}.route{padding:16px 0;gap:8px}.code{font-size:clamp(23px,7vw,40px)}.metrics{flex-wrap:wrap;justify-content:flex-start;gap:10px;padding-top:16px;margin-top:16px}.metric{flex:1 1 40%;}.metric+.metric{padding-left:10px}.metric:nth-child(3){border-left:0;padding-left:0}.metric .value{font-size:clamp(12px,3.8vw,18px)}.app.immersive .board{min-height:100svh;padding:20px 14px}}
 @media (max-height:430px) and (orientation:landscape){.app{padding:5px 12px;gap:0}.top{display:none}.board{padding:12px 24px}.flightmain{grid-template-columns:minmax(85px,15%) minmax(0,1fr) minmax(130px,25%);column-gap:18px}.airlogo{max-width:clamp(85px,12vw,150px)}.flightmeta{gap:7px}.airline{font-size:clamp(13px,2.5vw,23px)}.callsign{font-size:clamp(22px,4vw,38px)}.route{padding:7px 0}.code{font-size:clamp(22px,4vw,40px)}.metrics{padding-top:9px;margin-top:10px}.metric .value{font-size:clamp(11px,2vw,19px)}.app:not(.immersive) .settings{padding:4px 0}.app:not(.immersive) .bottom .btn{padding:7px}.status,.foot{font-size:9px}}
+
+/* Final clean-up: match the wide reference board, reduce portrait dead space */
+.board{grid-template-rows:auto auto;align-items:center;padding:clamp(14px,2.2vw,34px);}
+.flightmain{grid-template-columns:minmax(90px,17%) minmax(0,1fr) minmax(150px,28%);column-gap:clamp(12px,2vw,30px);}
+.airlogo{max-width:clamp(76px,12vw,180px);}
+.plane-art svg{max-width:100%;}
+.airline{letter-spacing:.10em;}
+.callsign{letter-spacing:.10em;}
+.metrics{padding-top:clamp(12px,2vh,24px);margin-top:clamp(12px,2vh,24px);}
+@media (orientation:portrait){
+ .app{min-height:100svh;padding:12px;gap:10px}
+ .board{flex:0 0 auto;min-height:0;height:auto;padding:18px 12px;grid-template-rows:auto auto;gap:0}
+ .flightmain{grid-template-columns:48px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:12px;row-gap:12px}
+ .airlogo{grid-column:1;grid-row:1;width:48px;max-width:48px;aspect-ratio:1;font-size:18px;letter-spacing:-.04em;overflow-wrap:anywhere}
+ .airlogo img{padding:2px}
+ .flightmeta{grid-column:2;grid-row:1;gap:10px;min-width:0}
+ .airline{font-size:clamp(13px,3.8vw,19px);line-height:1.15;letter-spacing:.07em;overflow-wrap:anywhere}
+ .callsign{font-size:clamp(23px,6.5vw,34px);letter-spacing:.08em}
+ .route{padding:12px 0;gap:6px}
+ .code{font-size:clamp(21px,6vw,32px);letter-spacing:.06em}
+ .city{font-size:9px}
+ .routeicon{font-size:20px}
+ .plane-art{grid-column:1 / -1;grid-row:2;width:100%;max-width:300px;justify-self:center;margin:4px auto 0;display:flex;}
+ .plane-art svg{width:100%;max-width:300px;height:auto}
+ .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;padding-top:14px;margin-top:14px}
+ .metric{min-width:0;flex:initial}
+ .metric+.metric{border-left:0;padding-left:0}
+ .metric:nth-child(2n){border-left:1px solid #ffffff25;padding-left:12px}
+ .metric .value{font-size:clamp(12px,3.6vw,17px);white-space:normal}
+ .settings{font-size:11px}
+ .settings input{width:100px}
+ .bottom{max-width:none}
+ .btn{font-size:10px;padding:11px 6px}
+ .status{font-size:11px}
+ .foot{font-size:9px}
+ .app.immersive .board{height:100svh;min-height:100svh;flex:1;padding:16px 12px;grid-template-rows:minmax(0,1fr) auto}
+ .app.immersive .flightmain{grid-template-columns:48px minmax(0,1fr);}
+ .app.immersive .plane-art{max-width:300px}
+}
+@media (orientation:landscape){
+ .app{min-height:100svh;gap:8px}
+ .board{min-height:0;flex:1}
+ .flightmain{grid-template-columns:minmax(90px,16%) minmax(0,1fr) minmax(145px,27%);}
+ .airline{font-size:clamp(15px,2.7vw,34px)}
+ .callsign{font-size:clamp(24px,4vw,54px)}
+ .code{font-size:clamp(24px,4.5vw,56px)}
+ .plane-art svg{max-width:clamp(170px,25vw,380px)}
+}
 </style>
 </head>
 <body>
@@ -127,7 +175,7 @@ function airlineInfo(callsign){
   UAL:{name:'United Airlines',domain:'united.com',short:'UA',base:'#003b71',accent:'#00a1de',third:'#ffffff',style:'klm'},
   ACA:{name:'Air Canada',domain:'aircanada.com',short:'AC',base:'#d71920',accent:'#ffffff',third:'#d71920',style:'swiss'}
  };
- return map[prefix]||{name:'Airline',domain:'',short:prefix.slice(0,2)||'✈',base:'#00bfe8',accent:'#e5007d',third:'#ffffff',style:'default'}
+ return map[prefix]||{name:(prefix||'AIRLINE'),domain:'',short:(prefix||'✈').slice(0,3),base:'#36dfff',accent:'#ff4f8b',third:'#f5f7fb',style:'default'}
 }
 function showAirlineLogo(callsign){const info=airlineInfo(callsign);$('airLogoFallback').textContent=info.short;$('airLogoFallback').style.display='block';$('airLogoImg').style.display='none';$('airLogoImg').removeAttribute('src');if(info.domain){const img=$('airLogoImg');img.onload=()=>{img.style.display='block';$('airLogoFallback').style.display='none'};img.onerror=()=>{img.style.display='none';$('airLogoFallback').style.display='block'};img.src='https://www.google.com/s2/favicons?domain='+encodeURIComponent(info.domain)+'&sz=128'}}
 function drawAircraft(type,callsign=''){
