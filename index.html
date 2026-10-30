@@ -401,21 +401,69 @@ async function refresh(){if(!pos){$('status').textContent='Bitte zuerst deinen S
  if(!validAircraft.length){$('airline').textContent='KEIN FLUGZEUG';$('airlineCodes').textContent='IATA: — · ICAO: —';$('callsign').textContent='IM GEWÄHLTEN RADIUS';$('aircraftType').textContent='—';$('distance').textContent='— KM';$('altitude').textContent='— FT';$('speed').textContent='— KTS';$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='';$('toCity').textContent='';$('status').textContent='Keine frische Position innerhalb von '+radiusKm+' km. Empfangslücken sind möglich; bitte später erneut versuchen.';$('liveText').textContent='KEIN TREFFER';return}
  const a=validAircraft[0];lastHex=a.hex;const ai=airlineInfo(a.flight);$('callsign').textContent=(a.flight?.trim()||a.t||a.r||'UNKNOWN').toUpperCase();$('airline').textContent=(ai.name||('ICAO '+a.hex.toUpperCase())).toUpperCase();$('airlineCodes').textContent='IATA: '+ai.iata+' · ICAO: '+ai.icao;$('aircraftType').textContent=(a.t||'—').toUpperCase();drawAircraft(a.t||'',a.flight||'');showAirlineLogo(a.flight);getPlanePhoto(a.hex,a.t||'',a.flight||'',a.r||'');$('distance').textContent=a.d<10?a.d.toFixed(1).replace('.',',')+' km':Math.round(a.d)+' km';$('altitude').textContent=niceAltFt(a.alt_baro);$('speed').textContent=niceSpeedKts(a.gs);$('fromCode').textContent='— — —';$('toCode').textContent='— — —';$('fromCity').textContent='Strecke wird gesucht';$('toCity').textContent='';$('distanceLabel').textContent='NÄCHSTES FLUGZEUG · '+Math.round(a.d)+' KM';$('liveText').textContent='LIVE';$('status').textContent='Zuletzt aktualisiert: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' · Positionsmeldung '+Math.round(a.seenPosSeconds)+' s alt.';
  const cs=(a.flight||'').trim();if(cs){
+  const aiRoute=airlineInfo(cs);
+  const compact=cs.replace(/[\s_-]/g,'').toUpperCase();
+  const icaoPrefix=(aiRoute.icao&&aiRoute.icao!=='—')?aiRoute.icao.toUpperCase():compact.slice(0,3);
+  const iataPrefix=(aiRoute.iata&&aiRoute.iata!=='—')?aiRoute.iata.toUpperCase():'';
+  // ICAO callsigns are not always the commercial flight number (e.g. THY2SY -> TK2SY).
+  const variants=[...new Set([compact, iataPrefix&&compact.startsWith(icaoPrefix)?iataPrefix+compact.slice(icaoPrefix.length):'', cs.toUpperCase()])].filter(Boolean);
   let routeFound=false;
-  // ADSBDB lookup by the live callsign/flight number; try common formatting variants.
-  const variants=[...new Set([cs,cs.replace(/\s+/g,''),cs.replace(/[-_]/g,'')])];
+  const applyRoute=(orig,dest)=>{
+   if(!orig||!dest)return false;
+   const from=orig.iata_code||orig.iata||orig.icao_code||orig.icao||'---';
+   const to=dest.iata_code||dest.iata||dest.icao_code||dest.icao||'---';
+   if(from==='---'||to==='---')return false;
+   $('fromCode').textContent=from;$('toCode').textContent=to;
+   $('fromCity').textContent=(orig.name||orig.municipality||orig.city||'Abflug')+' · geplant';
+   $('toCity').textContent=(dest.name||dest.municipality||dest.city||'Ziel')+' · geplant';
+   return true;
+  };
+  // 1) Primary database: try both ICAO callsign and its IATA flight-number form.
   for(const flightId of variants){
    try{
     const route=await getJson(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(flightId)}`);
     const fr=route.response?.flightroute;
-    if(fr?.origin&&fr?.destination){
-     const orig=fr.origin,dest=fr.destination;
-     $('fromCode').textContent=orig.iata_code||orig.icao_code||'---';$('toCode').textContent=dest.iata_code||dest.icao_code||'---';
-     $('fromCity').textContent=(orig.name||orig.municipality||'Abflug')+' · geplant';$('toCity').textContent=(dest.name||dest.municipality||'Ziel')+' · geplant';routeFound=true;break;
-    }
+    if(applyRoute(fr?.origin,fr?.destination)){routeFound=true;break;}
    }catch(e){}
   }
-  if(!routeFound){$('fromCity').textContent='Keine Streckenzuordnung für '+cs.toUpperCase();$('toCity').textContent='Flugnummer wird nicht in der Routendatenbank gefunden';}
+  // 2) Combined lookup by aircraft hex + callsign can resolve routes missed by callsign-only lookup.
+  if(!routeFound&&a.hex){
+   for(const flightId of variants.slice(0,2)){
+    try{
+     const combined=await getJson(`https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(a.hex)}?callsign=${encodeURIComponent(flightId)}`);
+     const response=combined.response||{};
+     const fr=response.flightroute||response;
+     if(applyRoute(fr.origin||response.origin,fr.destination||response.destination)){routeFound=true;break;}
+    }catch(e){}
+   }
+  }
+  // 3) Independent route database fallback (HexDB); supports ICAO and IATA callsigns.
+  if(!routeFound){
+   for(const flightId of variants.slice(0,2)){
+    try{
+     const fallback=await getJson(`https://hexdb.io/api/v2/routes/${encodeURIComponent(flightId)}`);
+     const r=fallback.response?.route||fallback.response||fallback.route||fallback;
+     if(applyRoute(r.origin,r.destination)){routeFound=true;break;}
+    }catch(e){}
+   }
+  }
+  // 4) Legacy HexDB route endpoints return airport-code pairs as plain text.
+  if(!routeFound){
+   for(const flightId of variants.slice(0,2)){
+    try{
+     const response=await fetch(`https://hexdb.io/callsign-route-iata?callsign=${encodeURIComponent(flightId)}`);
+     if(response.ok){
+      const pair=(await response.text()).trim().replace(/["']/g,'');
+      const match=pair.match(/\b([A-Z]{3,4})\s*[-,>]\s*([A-Z]{3,4})\b/i);
+      if(match){
+       $('fromCode').textContent=match[1].toUpperCase();$('toCode').textContent=match[2].toUpperCase();
+       $('fromCity').textContent='Abflug · Route gefunden';$('toCity').textContent='Ziel · Route gefunden';routeFound=true;break;
+      }
+     }
+    }catch(e){}
+   }
+  }
+  if(!routeFound){$('fromCity').textContent='Keine Streckenzuordnung für '+cs.toUpperCase();$('toCity').textContent='Auch alternative Routensuche ohne Treffer';}
  }
  }catch(e){$('liveText').textContent='OFFLINE';$('status').textContent='Flugdaten gerade nicht erreichbar. Bitte erneut versuchen; die offene Datenquelle kann zeitweise begrenzen.';$('feedStatus').textContent='Fehler beim Abruf der Live-Daten.'}finally{loading=false}}
 function start(){if(!navigator.geolocation){$('status').textContent='Dieser Browser unterstützt keine Standortfreigabe.';return}$('status').textContent='Bitte die Standortabfrage erlauben …';navigator.geolocation.getCurrentPosition(p=>{pos={lat:p.coords.latitude,lon:p.coords.longitude};$('status').textContent='Standort aktualisiert · Genauigkeit ca. '+Math.round(p.coords.accuracy)+' m';refresh();if(timer)clearInterval(timer);timer=setInterval(()=>navigator.geolocation.getCurrentPosition(q=>{pos={lat:q.coords.latitude,lon:q.coords.longitude};refresh()},()=>refresh(),{enableHighAccuracy:true,timeout:12000,maximumAge:0}),30000)},e=>{$('status').textContent=e.code===1?'Standortfreigabe abgelehnt. Bitte in den Safari-Einstellungen erlauben.':'Standort konnte nicht bestimmt werden. Bitte erneut versuchen.'},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})}
